@@ -71,11 +71,17 @@ struct ValueNumbering : public FunctionPass {
         if (F.getName() != func_name) return false;
 
         for (auto& basic_block : F)
-        {
+        {	
+            
             for (auto& inst : basic_block)
             {
+            	string temp_op;
+            	llvm::raw_string_ostream new_op(temp_op);
+            	new_op << inst;
+            	temp_op=new_op.str();
+            
                 errs() << inst << "\n";
-                if(inst.getOpcode() == Instruction::Load){
+                if(inst.getOpcode() == Instruction::Load || (temp_op.find("load") != std::string::npos)){
                     errs() << "This is Load"<<"\n";
                     auto* ptr = dyn_cast<User>(&inst);
                     for (auto it = ptr->op_begin(); it != ptr->op_end(); ++it) {
@@ -112,7 +118,7 @@ struct ValueNumbering : public FunctionPass {
                     }
                     errs() << "\tload_op" <<  load_op << "\n";
                 }
-                if(inst.getOpcode() == Instruction::Store){
+                if(false && inst.getOpcode() == Instruction::Store ){
                     errs() << "This is Store"<<"\n";
                     
                     auto* ptr = dyn_cast<User>(&inst);
@@ -140,7 +146,7 @@ struct ValueNumbering : public FunctionPass {
                     if (*found){
                     	store_op=temp.substr(0,temp.find("="));
                     	*store_op1=store_op;
-                    	errs() << "\tDuplicate load value found: " <<  store_op << "\n";
+                    	errs() << "\tDuplicate store value found: " <<  store_op << "\n";
                     	hashMap.insert(pair<string,int>(*store_op1,store_op_vn));
                     }
                     else{
