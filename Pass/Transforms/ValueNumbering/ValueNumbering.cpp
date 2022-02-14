@@ -37,12 +37,12 @@ struct ValueNumbering : public FunctionPass {
             else {return ""; }
     }
     
-    int populateHashMap(string *op,bool *found){
-    	errs() << "Inside Hash Function:"<<*op<<"\n";
-    	string str=*op;
+    int populateHashMap(string *operand,bool *found){
+    	errs() << "Inside Hash Function:"<<*operand<<"\n";
+    	string str=*operand;
     	str.erase(std::remove(str.begin(), str.end(), ' '), str.end());
-    	*op=str;
-        auto search = hashMap.find(*op);
+    	*operand=str;
+        auto search = hashMap.find(*operand);
         auto retvalue_number = value_number;
         if (search != hashMap.end()){
             *found = true;
@@ -50,7 +50,7 @@ struct ValueNumbering : public FunctionPass {
         }
         else{
             *found = false;
-            hashMap.insert(pair<string,int>(*op,value_number++));
+            hashMap.insert(pair<string,int>(*operand,value_number++));
         }
         return retvalue_number;
     }
@@ -64,7 +64,7 @@ struct ValueNumbering : public FunctionPass {
      	int op_3;
      	string *operand = new string;
       	string *hashKey = new string;
-      	string *instructionsSimplified = new string;
+      	string *instructionsBinary = new string;
 
       	hashMap.clear();   
         errs() << "ValueNumbering: " << F.getName() << "\n";
@@ -102,7 +102,7 @@ struct ValueNumbering : public FunctionPass {
                     if (*found){
                     	load_op=temp.substr(0,temp.find("="));
                     	*load_op1=load_op;
-                    	errs() << "\Duplicate load value found: " <<  load_op << "\n";
+                    	errs() << "\tDuplicate load value found: " <<  load_op << "\n";
                     	hashMap.insert(pair<string,int>(*load_op1,load_op_vn));
                     }
                     else{
@@ -118,6 +118,35 @@ struct ValueNumbering : public FunctionPass {
                     auto* ptr = dyn_cast<User>(&inst);
                     for (auto it = ptr->op_begin(); it != ptr->op_end(); ++it) {
                         errs() << "\t" <<  *(*it) << "\n";
+                    }
+                    string temp;
+                    llvm::raw_string_ostream op(temp);
+                    op << inst;
+                    temp=op.str();
+                    errs() << "\tstore_temp" <<  temp << "\n";
+                    string store_op=temp.substr(temp.find("="));
+                    if(store_op.find("%") != std::string::npos) {
+                    	store_op=store_op.substr(store_op.find("%"));
+                    }
+                    else {
+                   	store_op=store_op.substr(0,store_op.find("="));
+                    }
+                    store_op=store_op.substr(0,store_op.find(","));
+                    errs() << "\tstore_op: " <<  store_op << "\n";
+                    bool *found = new bool(false);
+                    string *store_op1=new string;
+                    *store_op1=store_op;
+                    int store_op_vn=populateHashMap(store_op1,found);
+                    if (*found){
+                    	store_op=temp.substr(0,temp.find("="));
+                    	*store_op1=store_op;
+                    	errs() << "\tDuplicate load value found: " <<  store_op << "\n";
+                    	hashMap.insert(pair<string,int>(*store_op1,store_op_vn));
+                    }
+                    else{
+                    	store_op=temp.substr(0,temp.find("="));
+                    	*store_op1=store_op;
+                    	hashMap.insert(pair<string,int>(*store_op1,value_number++));
                     }
                 }
                 if (inst.isBinaryOp())
@@ -196,8 +225,8 @@ struct ValueNumbering : public FunctionPass {
                     op_1 = populateHashMap(op1,found);
                     op_2 = populateHashMap(op2,found);
                     *hashKey = "%"+to_string(op_1) + *operand + "%"+to_string(op_2);
-                    string instructionSimp = *op3 + " = " + *op1 + *operand + *op2;
-                   *instructionsSimplified = *instructionsSimplified + instructionSimp + "\n";
+                    string instruction = *op3 + " = " + *op1 + *operand + *op2;
+                   *instructionsBinary = *instructionsBinary + instruction + "\n";
                     op_3 = populateHashMap(hashKey,found);
                     if (*found){
                          errs() << "---------------- Duplicates found: " << *op1 << *operand << *op2 << " ----------------\n" << op_1 << "<<<" << op_2 << "<<<" << op_3 <<"<<<\n";
@@ -206,7 +235,7 @@ struct ValueNumbering : public FunctionPass {
                     hashMap.insert(pair<string,int>(*op3,op_3));
                 } // end if
             } // end for inst
-            errs() << "instructions: \n" << *instructionsSimplified;
+            errs() << "instructions: \n" << *instructionsBinary;
         } // end for block
         return false;
     } // end runOnFunction
